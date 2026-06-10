@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Check Pumble's update feed for a new Linux version; if the GitHub release
-# doesn't exist yet, download the deb, verify it, repackage as AppImage and
-# publish a release. Requires the gh CLI (authenticated, or GH_TOKEN set).
+# Fetch Pumble's Linux update feed, download the latest deb, verify its sha512
+# and repackage it as an AppImage in the current directory.
+#   --check   only print the latest upstream version, don't download or build
 set -euo pipefail
 
 FEED="https://pumble.com/download/desktop/linux"
@@ -13,14 +13,17 @@ SHA512_B64="$(awk '/^sha512:/{print $2}' <<<"$YML")"
 DATE="$(awk '/^releaseDate:/{print $2}' <<<"$YML" | tr -d "'")"
 [ -n "$VERSION" ] && [ -n "$DEB_NAME" ] || { echo "error: could not parse feed" >&2; exit 1; }
 
-TAG="v$VERSION"
-echo "==> Upstream version: $VERSION (released $DATE)"
+# Expose feed data to subsequent GitHub Actions steps
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf 'version=%s\ndate=%s\ndeb=%s\n' "$VERSION" "$DATE" "$DEB_NAME" >> "$GITHUB_OUTPUT"
+fi
 
-if gh release view "$TAG" >/dev/null 2>&1; then
-    echo "==> Release $TAG already exists, nothing to do."
+if [ "${1:-}" = "--check" ]; then
+    echo "$VERSION"
     exit 0
 fi
 
+echo "==> Upstream version: $VERSION (released $DATE)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -34,11 +37,4 @@ if [ "$ACTUAL" != "$SHA512_B64" ]; then
     exit 1
 fi
 
-APPIMAGE="Pumble-$VERSION-x86_64.AppImage"
-"$(dirname "$0")/build-appimage.sh" "$WORK/$DEB_NAME" "$WORK/$APPIMAGE"
-
-echo "==> Creating release $TAG"
-gh release create "$TAG" "$WORK/$APPIMAGE" \
-    --title "Pumble $VERSION" \
-    --notes "AppImage repackaged from the official deb published $DATE at $FEED/$DEB_NAME (sha512 verified against the upstream update feed)."
-echo "==> Released $TAG"
+"$(dirname "$0")/build-appimage.sh" "$WORK/$DEB_NAME" "Pumble-$VERSION-x86_64.AppImage"

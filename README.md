@@ -21,9 +21,10 @@ or `appimaged`.
 - Pumble publishes an electron-updater feed at
   `https://pumble.com/download/desktop/linux/latest-linux.yml`.
 - A scheduled GitHub Actions workflow ([release.yml](.github/workflows/release.yml))
-  checks it daily. When a version appears that has no release tag here yet, it
-  downloads the deb, verifies its sha512 against the feed, repackages it as an
-  AppImage and publishes a `vX.Y.Z` release.
+  checks it daily. When a version appears that has no `vX.Y.Z` tag here yet,
+  [`fetch-and-build.sh`](fetch-and-build.sh) downloads the deb, verifies its
+  sha512 against the feed and repackages it as an AppImage, which the workflow
+  publishes as a release.
 - [`build-appimage.sh`](build-appimage.sh) does the actual repackaging:
   - extracts `/opt/Pumble` from the deb into an AppDir with the desktop entry
     and icon;
@@ -34,8 +35,8 @@ or `appimaged`.
     AppImage), falling back to `--no-sandbox` only where namespaces are
     disabled.
 
-To build locally: `./build-appimage.sh Pumble-linux-X.Y.Z.deb`.
-To check/release manually (needs an authenticated `gh`): `./check-and-release.sh`.
+To fetch the latest version and build locally: `./fetch-and-build.sh`
+(or `./build-appimage.sh Pumble-linux-X.Y.Z.deb` if you already have a deb).
 
 > **Note:** GitHub pauses scheduled workflows after ~60 days without repo
 > activity. If that happens, re-enable it from the Actions tab or trigger the
