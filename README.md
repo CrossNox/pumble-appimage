@@ -19,7 +19,7 @@ The AppImage does not update itself. New upstream versions are picked up automat
 
 ## Is this safe?
 
-Every release is built unattended by a [GitHub Actions workflow](.github/workflows/release.yml) in this repo: it downloads the official deb from `pumble.com`, verifies its sha512 checksum against Pumble's own update feed, and repackages the unmodified app as an AppImage. No code is added or changed — you can audit the couple of shell scripts that do it.
+Every release is built unattended by a [GitHub Actions workflow](.github/workflows/release.yml) in this repo: it downloads the official deb from `pumble.com`, verifies its sha512 checksum against Pumble's own update feed, and repackages the unmodified app as an AppImage. No code is added or changed — you can audit the single short shell script that does it.
 
 ## Known issues
 
@@ -28,7 +28,8 @@ Every release is built unattended by a [GitHub Actions workflow](.github/workflo
 ## Building it yourself
 
 ```bash
-./fetch-and-build.sh
+./pumble-appimage.sh fetch                          # latest, straight from pumble.com
+./pumble-appimage.sh build Pumble-linux-X.Y.Z.deb   # from a deb you already have
 ```
 
 Requires `curl`, `tar`, `ar` (binutils) and `openssl`; appimagetool is

@@ -21,7 +21,7 @@ jobs:
         run: |
           # Releases create tags, so an existing v$VERSION tag means
           # this version was already published.
-          VERSION="$(./fetch-and-build.sh --check)"
+          VERSION="$(./pumble-appimage.sh check)"
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Release v$VERSION already exists, nothing to do."
             echo "new=false" >> "$GITHUB_OUTPUT"
@@ -32,7 +32,7 @@ jobs:
 
       - name: Download deb and build AppImage
         if: steps.feed.outputs.new == 'true'
-        run: ./fetch-and-build.sh
+        run: ./pumble-appimage.sh fetch
 
       - name: Publish release
         if: steps.feed.outputs.new == 'true'
