@@ -1,7 +1,7 @@
 # Pumble AppImage
 
 Unofficial AppImage builds of [Pumble](https://pumble.com), the team chat app —
-for Fedora and any other Linux distribution that doesn't use deb packages.
+runs on any Linux distribution, no installation or root required.
 Not affiliated with Pumble/CAKE.com.
 
 ## Install
