@@ -1,53 +1,46 @@
 #!/usr/bin/env bash
-# Repackage a Pumble .deb as an AppImage.
-# Usage: ./build-appimage.sh <Pumble-linux-X.Y.Z.deb> [output.AppImage]
+# usage: build-appimage.sh <Pumble-linux-X.Y.Z.deb> [output.AppImage]
 set -euo pipefail
 
-DEB="$(readlink -f "$1")"
-[ -r "$DEB" ] || { echo "error: cannot read $DEB" >&2; exit 1; }
+deb=$(readlink -f "${1:?usage: $0 <Pumble-linux-X.Y.Z.deb> [output.AppImage]}")
+version=$(basename "$deb" | sed -n 's/^Pumble-linux-\(.*\)\.deb$/\1/p')
+[ -n "$version" ] || { echo "can't parse version from ${1##*/}" >&2; exit 1; }
+out=$(readlink -f "${2:-Pumble-$version-x86_64.AppImage}")
 
-# Version from the filename, e.g. Pumble-linux-1.4.6.deb -> 1.4.6
-VERSION="$(basename "$DEB" | sed -n 's/^Pumble-linux-\(.*\)\.deb$/\1/p')"
-[ -n "$VERSION" ] || { echo "error: cannot parse version from filename" >&2; exit 1; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
 
-OUT="$(readlink -f "${2:-Pumble-$VERSION-x86_64.AppImage}")"
-
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-
-echo "==> Extracting $DEB"
-if command -v dpkg-deb >/dev/null 2>&1; then
-    dpkg-deb -x "$DEB" "$WORK/data"
+if command -v dpkg-deb >/dev/null; then
+    dpkg-deb -x "$deb" "$tmp/root"
 else
-    (cd "$WORK" && ar x "$DEB")
-    mkdir "$WORK/data"
-    tar -xf "$WORK"/data.tar.* -C "$WORK/data"
+    (cd "$tmp" && ar x "$deb")
+    mkdir "$tmp/root"
+    tar -xf "$tmp"/data.tar.* -C "$tmp/root"
 fi
 
-APPDIR="$WORK/Pumble.AppDir"
-echo "==> Building AppDir"
-mkdir "$APPDIR"
-cp -a "$WORK/data/opt/Pumble/." "$APPDIR/"
-cp "$WORK/data/usr/share/icons/hicolor/256x256/apps/pumble-desktop.png" "$APPDIR/"
-ln -sf pumble-desktop.png "$APPDIR/.DirIcon"
+appdir=$tmp/AppDir
+mkdir "$appdir"
+cp -a "$tmp/root/opt/Pumble/." "$appdir/"
+cp "$tmp/root/usr/share/icons/hicolor/256x256/apps/pumble-desktop.png" "$appdir/"
+ln -s pumble-desktop.png "$appdir/.DirIcon"
 
-# electron-builder marker that makes the auto-updater attempt deb-style updates
-rm -f "$APPDIR/resources/package-type"
+# electron-builder marker; with it present the app tries deb-style autoupdates
+rm -f "$appdir/resources/package-type"
 
-cat > "$APPDIR/AppRun" <<'EOF'
+# chrome-sandbox can't be setuid inside an AppImage, so use the userns
+# sandbox where the kernel allows it and --no-sandbox elsewhere
+cat >"$appdir/AppRun" <<'EOF'
 #!/bin/bash
-HERE="$(dirname "$(readlink -f "${0}")")"
-# chrome-sandbox cannot be setuid inside an AppImage; rely on unprivileged
-# user namespaces (default on Fedora). Fall back to --no-sandbox if disabled.
-if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo 1)" = "1" ]; then
-    exec "${HERE}/pumble-desktop" "$@"
+here=$(dirname "$(readlink -f "$0")")
+if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo 1)" = 1 ]; then
+    exec "$here/pumble-desktop" "$@"
 else
-    exec "${HERE}/pumble-desktop" --no-sandbox "$@"
+    exec "$here/pumble-desktop" --no-sandbox "$@"
 fi
 EOF
-chmod +x "$APPDIR/AppRun"
+chmod +x "$appdir/AppRun"
 
-cat > "$APPDIR/pumble-desktop.desktop" <<EOF
+cat >"$appdir/pumble-desktop.desktop" <<EOF
 [Desktop Entry]
 Name=Pumble
 Exec=pumble-desktop %U
@@ -57,24 +50,15 @@ Icon=pumble-desktop
 StartupWMClass=Pumble
 MimeType=x-scheme-handler/pumble;
 Categories=Network;Office;
-X-AppImage-Version=$VERSION
+X-AppImage-Version=$version
 EOF
 
-# Locate or fetch appimagetool
-TOOL="${APPIMAGETOOL:-}"
-if [ -z "$TOOL" ]; then
-    if command -v appimagetool >/dev/null 2>&1; then
-        TOOL=appimagetool
-    else
-        TOOL="$WORK/appimagetool"
-        echo "==> Downloading appimagetool"
-        curl -fsSL -o "$TOOL" \
-            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-        chmod +x "$TOOL"
-    fi
+tool=${APPIMAGETOOL:-$(command -v appimagetool || true)}
+if [ -z "$tool" ]; then
+    tool=$tmp/appimagetool
+    curl -fsSL -o "$tool" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+    chmod +x "$tool"
 fi
 
-echo "==> Packing $OUT"
-# APPIMAGE_EXTRACT_AND_RUN: lets the appimagetool AppImage run without FUSE (e.g. on CI)
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$APPDIR" "$OUT"
-echo "==> Done: $OUT"
+# APPIMAGE_EXTRACT_AND_RUN so the tool works without FUSE (CI)
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$tool" "$appdir" "$out"

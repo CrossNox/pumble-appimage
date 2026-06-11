@@ -1,40 +1,36 @@
 #!/usr/bin/env bash
-# Fetch Pumble's Linux update feed, download the latest deb, verify its sha512
-# and repackage it as an AppImage in the current directory.
-#   --check   only print the latest upstream version, don't download or build
+# Download the latest Pumble deb from the official update feed, check its
+# sha512 and repackage it as an AppImage here. --check prints the latest
+# version and exits.
 set -euo pipefail
 
-FEED="https://pumble.com/download/desktop/linux"
+feed=https://pumble.com/download/desktop/linux
 
-YML="$(curl -fsSL "$FEED/latest-linux.yml")"
-VERSION="$(awk '/^version:/{print $2}' <<<"$YML")"
-DEB_NAME="$(awk '/^path:/{print $2}' <<<"$YML")"
-SHA512_B64="$(awk '/^sha512:/{print $2}' <<<"$YML")"
-DATE="$(awk '/^releaseDate:/{print $2}' <<<"$YML" | tr -d "'")"
-[ -n "$VERSION" ] && [ -n "$DEB_NAME" ] || { echo "error: could not parse feed" >&2; exit 1; }
+yml=$(curl -fsSL "$feed/latest-linux.yml")
+version=$(awk '/^version:/{print $2}' <<<"$yml")
+deb=$(awk '/^path:/{print $2}' <<<"$yml")
+sha512=$(awk '/^sha512:/{print $2}' <<<"$yml")
+released=$(awk '/^releaseDate:/{print $2}' <<<"$yml" | tr -d "'")
+[ -n "$version" ] && [ -n "$deb" ] || { echo "can't parse $feed/latest-linux.yml" >&2; exit 1; }
 
-# Expose feed data to subsequent GitHub Actions steps
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-    printf 'version=%s\ndate=%s\ndeb=%s\n' "$VERSION" "$DATE" "$DEB_NAME" >> "$GITHUB_OUTPUT"
+    printf 'version=%s\ndate=%s\ndeb=%s\n' "$version" "$released" "$deb" >>"$GITHUB_OUTPUT"
 fi
 
-if [ "${1:-}" = "--check" ]; then
-    echo "$VERSION"
+if [ "${1:-}" = --check ]; then
+    echo "$version"
     exit 0
 fi
 
-echo "==> Upstream version: $VERSION (released $DATE)"
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
 
-echo "==> Downloading $FEED/$DEB_NAME"
-curl -fL --retry 3 -o "$WORK/$DEB_NAME" "$FEED/$DEB_NAME"
+echo "fetching $deb (released $released)"
+curl -fL --retry 3 -o "$tmp/$deb" "$feed/$deb"
 
-echo "==> Verifying sha512"
-ACTUAL="$(openssl dgst -sha512 -binary "$WORK/$DEB_NAME" | base64 -w0)"
-if [ "$ACTUAL" != "$SHA512_B64" ]; then
-    echo "error: sha512 mismatch (feed: $SHA512_B64, got: $ACTUAL)" >&2
+if [ "$(openssl dgst -sha512 -binary "$tmp/$deb" | base64 -w0)" != "$sha512" ]; then
+    echo "sha512 mismatch on $deb" >&2
     exit 1
 fi
 
-"$(dirname "$0")/build-appimage.sh" "$WORK/$DEB_NAME" "Pumble-$VERSION-x86_64.AppImage"
+"$(dirname "$0")/build-appimage.sh" "$tmp/$deb" "Pumble-$version-x86_64.AppImage"
