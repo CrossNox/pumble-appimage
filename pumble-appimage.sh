@@ -135,6 +135,7 @@ if [ $check = yes ]; then
 fi
 
 [ $fetch = yes ] || [ $build = yes ] || usage
+[ $build = yes ] || [ -z "$out" ] || usage  # -o only makes sense with --build
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
