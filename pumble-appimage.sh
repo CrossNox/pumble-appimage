@@ -110,7 +110,7 @@ EOF
     ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$tool" "$appdir" "$out"
 }
 
-check=no fetch=no build=no out= deb=
+check=no fetch=no build=no out='' deb=''
 
 [ $# -gt 0 ] || usage
 while [ $# -gt 0 ]; do
@@ -126,7 +126,9 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $check = yes ]; then
-    [ $fetch = no ] && [ $build = no ] && [ -z "$deb" ] || usage
+    if [ $fetch = yes ] || [ $build = yes ] || [ -n "$deb" ]; then
+        usage
+    fi
     read_feed
     echo "$version"
     exit 0
