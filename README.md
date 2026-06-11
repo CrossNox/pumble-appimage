@@ -12,6 +12,8 @@ chmod +x Pumble-*-x86_64.AppImage
 ./Pumble-*-x86_64.AppImage
 ```
 
+On first run the app installs a desktop entry (`~/.local/share/applications/pumble-appimage.desktop`) and icon, which gives you a menu entry and registers the `pumble://` handler that browser-based login needs to hand the session back to the app. It won't touch an existing `pumble://` handler, and you can skip the whole thing with `PUMBLE_NO_INTEGRATION=1` (then register a handler yourself, or login won't complete). If you move or rename the AppImage, run it once to re-point the entry.
+
 ## Updates
 
 The AppImage does not update itself. New upstream versions are picked up automatically and published here as releases, usually within a day — click **Watch → Custom → Releases** on this repo to get notified.

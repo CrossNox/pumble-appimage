@@ -77,6 +77,36 @@ build_appimage() {  # <deb> <output (may be empty)>
     cat >"$appdir/AppRun" <<'EOF'
 #!/bin/bash
 here=$(dirname "$(readlink -f "$0")")
+
+# Browser login hands the session back via a pumble:// URL, which only works
+# if something on the host handles that scheme. Register a desktop entry
+# (menu entry + scheme handler) pointing at this AppImage, unless another
+# handler already exists or PUMBLE_NO_INTEGRATION is set. Rewritten whenever
+# the AppImage path changes.
+if [ -n "$APPIMAGE" ] && [ -z "$PUMBLE_NO_INTEGRATION" ]; then
+    data=${XDG_DATA_HOME:-$HOME/.local/share}
+    desktop=$data/applications/pumble-appimage.desktop
+    handler=$(xdg-mime query default x-scheme-handler/pumble 2>/dev/null)
+    if { [ -z "$handler" ] || [ "$handler" = pumble-appimage.desktop ]; } &&
+        ! grep -qF "Exec=\"$APPIMAGE\" %U" "$desktop" 2>/dev/null; then
+        mkdir -p "$data/applications" "$data/icons/hicolor/256x256/apps"
+        cp -f "$here/pumble-desktop.png" "$data/icons/hicolor/256x256/apps/" 2>/dev/null
+        cat >"$desktop" <<DESKTOP
+[Desktop Entry]
+Name=Pumble
+Exec="$APPIMAGE" %U
+Terminal=false
+Type=Application
+Icon=pumble-desktop
+StartupWMClass=Pumble
+MimeType=x-scheme-handler/pumble;
+Categories=Network;Office;
+DESKTOP
+        update-desktop-database "$data/applications" 2>/dev/null
+        xdg-mime default pumble-appimage.desktop x-scheme-handler/pumble 2>/dev/null
+    fi
+fi
+
 if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo 1)" = 1 ]; then
     exec "$here/pumble-desktop" "$@"
 else
