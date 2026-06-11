@@ -6,13 +6,15 @@ feed=https://pumble.com/download/desktop/linux
 
 usage() {
     cat >&2 <<EOF
-usage: ${0##*/} check
-       ${0##*/} fetch [-o file.AppImage]
-       ${0##*/} build [-o file.AppImage] <Pumble-linux-X.Y.Z.deb>
+usage: ${0##*/} --check
+       ${0##*/} --fetch [--build] [-o file.AppImage]
+       ${0##*/} --build [-o file.AppImage] <Pumble-linux-X.Y.Z.deb>
 
-  check   print the newest version in the upstream update feed
-  fetch   download the newest deb, verify its sha512 and build an AppImage
-  build   build an AppImage from a deb you already have
+  --check   print the newest version in the upstream update feed
+  --fetch   download the newest deb into the current directory and
+            verify its sha512 against the feed
+  --build   repackage the deb (the one just fetched, or the one given
+            as an argument) as an AppImage
 EOF
     exit 64
 }
@@ -39,8 +41,8 @@ read_feed() {
 
 fetch_deb() {
     echo "fetching $deb_name (released $released)"
-    curl -fL --retry 3 -o "$tmp/$deb_name" "$feed/$deb_name"
-    if [ "$(openssl dgst -sha512 -binary "$tmp/$deb_name" | base64 -w0)" != "$sha512" ]; then
+    curl -fL --retry 3 -o "$deb_name" "$feed/$deb_name"
+    if [ "$(openssl dgst -sha512 -binary "$deb_name" | base64 -w0)" != "$sha512" ]; then
         die "sha512 mismatch on $deb_name"
     fi
 }
@@ -108,38 +110,41 @@ EOF
     ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$tool" "$appdir" "$out"
 }
 
-cmd=${1:-}
-[ $# -eq 0 ] || shift
+check=no fetch=no build=no out= deb=
 
-out=
-while getopts o: opt; do
-    case $opt in
-        o) out=$OPTARG ;;
-        *) usage ;;
+[ $# -gt 0 ] || usage
+while [ $# -gt 0 ]; do
+    case $1 in
+        --check) check=yes ;;
+        --fetch) fetch=yes ;;
+        --build) build=yes ;;
+        -o) [ $# -ge 2 ] || usage; out=$2; shift ;;
+        -*) usage ;;
+        *) [ -z "$deb" ] || usage; deb=$1 ;;
     esac
+    shift
 done
-shift $((OPTIND - 1))
+
+if [ $check = yes ]; then
+    [ $fetch = no ] && [ $build = no ] && [ -z "$deb" ] || usage
+    read_feed
+    echo "$version"
+    exit 0
+fi
+
+[ $fetch = yes ] || [ $build = yes ] || usage
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-case $cmd in
-    check)
-        [ $# -eq 0 ] || usage
-        read_feed
-        echo "$version"
-        ;;
-    fetch)
-        [ $# -eq 0 ] || usage
-        read_feed
-        fetch_deb
-        build_appimage "$tmp/$deb_name" "$out"
-        ;;
-    build)
-        [ $# -eq 1 ] || usage
-        build_appimage "$(readlink -f "$1")" "$out"
-        ;;
-    *)
-        usage
-        ;;
-esac
+if [ $fetch = yes ]; then
+    [ -z "$deb" ] || usage  # --fetch picks its own deb
+    read_feed
+    fetch_deb
+    deb=$deb_name
+fi
+
+if [ $build = yes ]; then
+    [ -n "$deb" ] || usage
+    build_appimage "$(readlink -f "$deb")" "$out"
+fi

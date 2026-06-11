@@ -1,11 +1,10 @@
 # Pumble AppImage
 
-Unofficial AppImage builds of [Pumble](https://pumble.com), the team chat app — runs on any Linux distribution, no installation or root required. Not affiliated with Pumble/CAKE.com.
+Unofficial AppImage builds of [Pumble](https://pumble.com), the team chat app — runs on any Linux distribution. Not affiliated with Pumble/CAKE.com.
 
 ## Install
 
-1. Download `Pumble-X.Y.Z-x86_64.AppImage` from the
-   [latest release](../../releases/latest).
+1. Download `Pumble-X.Y.Z-x86_64.AppImage` from the [latest release](../../releases/latest).
 2. Make it executable and run it:
 
 ```bash
@@ -28,8 +27,8 @@ Every release is built unattended by a [GitHub Actions workflow](.github/workflo
 ## Building it yourself
 
 ```bash
-./pumble-appimage.sh fetch                          # latest, straight from pumble.com
-./pumble-appimage.sh build Pumble-linux-X.Y.Z.deb   # from a deb you already have
+./pumble-appimage.sh --fetch --build                  # latest, straight from pumble.com
+./pumble-appimage.sh --build Pumble-linux-X.Y.Z.deb   # from a deb you already have
 ```
 
 Requires `curl`, `tar`, `ar` (binutils) and `openssl`; appimagetool is
