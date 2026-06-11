@@ -27,9 +27,8 @@ Every release is built unattended by a [GitHub Actions workflow](.github/workflo
 ## Building it yourself
 
 ```bash
-./pumble-appimage.sh --fetch --build                  # latest, straight from pumble.com
-./pumble-appimage.sh --build Pumble-linux-X.Y.Z.deb   # from a deb you already have
+./pumble-appimage.sh --fetch --build
+./pumble-appimage.sh --build Pumble-linux-X.Y.Z.deb
 ```
 
-Requires `curl`, `tar`, `ar` (binutils) and `openssl`; appimagetool is
-downloaded automatically.
+Requires `curl`, `tar`, `ar` (binutils) and `openssl`; appimagetool is downloaded automatically.
